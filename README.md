@@ -6,8 +6,9 @@ Skinloop checkout. The browser return is never proof of payment. Delivery is
 allowed only after a signed Skinloop `completed` event and fresh reads of both
 APIs.
 
-SellAuth API schemas and authentication are deliberately not inferred. Configure
-the official API base including `/v1` and a shop-scoped Bearer key. The Worker
+SellAuth API schemas and authentication are deliberately not inferred. The
+official API base including `/v1` is preconfigured; provide a shop-scoped
+Bearer key. The Worker
 accepts only a documented invoice object with `id`, `status` (`pending` or
 `confirming`), `price`, `paid` (`0.00`), and `currency`; any other response fails closed.
 Processing uses the official GET
@@ -24,11 +25,12 @@ transient failures.
 ## Merchant setup
 
 For the hosted setup, use the Deploy to Cloudflare button in the Skinloop
-SellAuth guide once its public template repository is released. Cloudflare
+SellAuth guide. Cloudflare
 provisions the declared D1 database and Queues from `wrangler.toml`; the
-`deploy` script applies D1 migrations by binding before deploying. Enter the
-two API keys as encrypted secrets when prompted. Add the Skinloop webhook
-secret only after the Worker has a URL.
+`deploy` script applies D1 migrations by binding before deploying. The three
+service URLs are preconfigured. Enter only the shop ID and two API keys
+(encrypted secrets) when prompted. Add the Skinloop webhook secret after the
+Worker has a URL.
 
 The commands below are for merchants who prefer to deploy manually.
 
@@ -39,19 +41,16 @@ merchant's Cloudflare identity before running the scripts.
 ```sh
 npm install
 bash scripts/provision.sh
-# Edit wrangler.toml with the safe values below.
+# Set SELLAUTH_SHOP_ID in wrangler.toml.
 ```
 
 `provision.sh` is repeatable: it creates (or reuses) the declared D1 database,
 fulfillment Queue, and dead-letter Queue, writes the D1 ID into `wrangler.toml`,
 and applies the checked-in migrations remotely. It never handles secrets.
 
-Before deployment, set these safe values in `wrangler.toml`:
-
-* `SKINLOOP_API_BASE_URL` and `SKINLOOP_HOSTED_ORIGIN` must be HTTPS origins.
-* `SELLAUTH_API_BASE_URL` must be the official HTTPS API base including `/v1`
-  (for example `https://api.sellauth.com/v1`).
-* `SELLAUTH_SHOP_ID` is the merchant's SellAuth shop ID, not a product ID.
+Before deployment, set `SELLAUTH_SHOP_ID` to the merchant's shop ID (not a
+product ID) in `wrangler.toml`. The Skinloop API, Skinloop checkout, and
+SellAuth API URLs are already set there.
 
 Store only API credentials as Cloudflare encrypted secrets before deployment:
 

@@ -14,9 +14,6 @@
     "bindings": {
       "SKINLOOP_API_KEY": {"description":"Skinloop checkout:create and checkout:read key, Rust restricted. Store as a secret."},
       "SELLAUTH_API_KEY": {"description":"Merchant-owned scoped SellAuth shop API key. Store as a secret."},
-      "SKINLOOP_API_BASE_URL": {"description":"Skinloop API origin, https://api.skinloop.io."},
-      "SKINLOOP_HOSTED_ORIGIN": {"description":"Skinloop checkout origin, https://checkout.skinloop.io."},
-      "SELLAUTH_API_BASE_URL": {"description":"SellAuth API base URL, https://api.sellauth.com/v1."},
       "SELLAUTH_SHOP_ID": {"description":"Merchant SellAuth shop identifier."}
     }
   },

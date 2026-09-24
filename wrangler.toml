@@ -2,8 +2,8 @@ name = "sellauth-skinloop-rust"
 main = "src/worker.ts"
 compatibility_date = "2026-09-22"
 [vars]
-SKINLOOP_API_BASE_URL = ""
-SKINLOOP_HOSTED_ORIGIN = ""
+SKINLOOP_API_BASE_URL = "https://api.skinloop.io"
+SKINLOOP_HOSTED_ORIGIN = "https://checkout.skinloop.io"
 SELLAUTH_API_BASE_URL = "https://api.sellauth.com/v1"
 SELLAUTH_SHOP_ID = ""
 [triggers]

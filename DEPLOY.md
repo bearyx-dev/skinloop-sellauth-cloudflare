@@ -4,9 +4,8 @@
 2. Run `bash scripts/provision.sh`. It creates or reuses the declared D1,
    fulfillment Queue, and DLQ, updates the D1 ID, and applies remote migrations.
    It does not deploy and is safe to repeat.
-3. Set `SKINLOOP_API_BASE_URL`, `SKINLOOP_HOSTED_ORIGIN`,
-   `SELLAUTH_API_BASE_URL` (official HTTPS base ending in `/v1`),
-   and `SELLAUTH_SHOP_ID` in `wrangler.toml`.
+3. Set the merchant's `SELLAUTH_SHOP_ID` in `wrangler.toml`. The Skinloop API,
+   hosted checkout, and SellAuth API URLs are already preconfigured there.
 4. Add only these pre-deployment encrypted secrets:
 
    ```sh
