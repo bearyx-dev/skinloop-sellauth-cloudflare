@@ -10,7 +10,9 @@ SellAuth API schemas and authentication are deliberately not inferred. The
 official API base including `/v1` is preconfigured; provide a shop-scoped
 Bearer key. The Worker
 accepts only a documented invoice object with `id`, `status` (`pending` or
-`confirming`), `price`, `paid` (`0.00`), and `currency`; any other response fails closed.
+`confirming`), `price`, `paid` (`0.00`), `currency`, and a buyer `email`;
+any other response fails closed. The invoice email is passed as the required
+`customerEmail` when creating the Skinloop checkout.
 Processing uses the official GET
 `/v1/shops/{shop_id}/invoices/{id}/process?mark_as_paid=true` operation and
 requires a subsequent authoritative `completed` read with `paid` equal to

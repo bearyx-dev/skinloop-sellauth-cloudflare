@@ -56,6 +56,8 @@ function fixture() {
   const queue = new FakeQueue();
   let invoiceStatus = "pending";
   let invoicePaid = "0.00";
+  let invoiceEmail = "buyer@sellauth.test";
+  let checkoutCustomerEmail: string | undefined;
   let processCalls = 0;
   let failProcessing = false;
   let processResponseFailure = false;
@@ -84,11 +86,14 @@ function fixture() {
           return Response.json({ success: "Invoice processed" });
         }
       }
-      return Response.json({ id: "12345", status: invoiceStatus, currency: "USD", price: "12.34", paid: invoicePaid });
+      return Response.json({ id: "12345", status: invoiceStatus, currency: "USD", price: "12.34", paid: invoicePaid, email: invoiceEmail });
     }
     if (url.pathname === "/v1/merchant-api/checkouts" && init?.method === "POST") {
       checkoutPosts++;
       const body = JSON.parse(String(init.body));
+      checkoutCustomerEmail = body.customerEmail;
+      if (typeof body.customerEmail !== "string" || !body.customerEmail.includes("@"))
+        return Response.json({ error: "invalid", message: "customerEmail must be a valid email address" }, { status: 400 });
       return Response.json({
         id: `checkout-${checkoutPosts}`,
         hostedUrl: "https://checkout.test/session/123",
@@ -116,7 +121,9 @@ function fixture() {
   };
   return {
     db, env, queue, fetchMock, get processCalls() { return processCalls; },
+    get checkoutCustomerEmail() { return checkoutCustomerEmail; },
     setInvoice(s: string, paid = s === "completed" ? "12.34" : "0.00") { invoiceStatus = s; invoicePaid = paid; },
+    setInvoiceEmail(v: string) { invoiceEmail = v; },
     setFailProcessing(v: boolean) { failProcessing = v; },
     setProcessResponseFailure(v: boolean) { processResponseFailure = v; },
     expireNextCheckout() { checkoutExpiry = new Date(Date.now() - 1000).toISOString(); },
@@ -171,11 +178,25 @@ test("numeric unpaid checkout is created and second visit reuses it", async () =
     const first = await worker.fetch(new Request("https://merchant.test/pay?invoice=12345"), f.env);
     assert.equal(first.status, 303);
     assert.equal(first.headers.get("location"), "https://checkout.test/session/123");
+    assert.equal(f.checkoutCustomerEmail, "buyer@sellauth.test");
     const second = await worker.fetch(new Request("https://merchant.test/pay?invoice=12345"), f.env);
     assert.equal(second.status, 303);
     assert.equal(second.headers.get("location"), "https://checkout.test/session/123");
     assert.equal((f.db.prepare("SELECT amount_minor,status FROM payments WHERE invoice_id='12345'").get() as any).amount_minor, 1234);
     assert.equal((await worker.fetch(new Request("https://merchant.test/pay?invoice=nope"), f.env)).status, 400);
+  } finally { globalThis.fetch = original; f.db.close(); }
+});
+
+test("invoice without buyer email fails before requesting a checkout", async () => {
+  const f = fixture();
+  const original = globalThis.fetch;
+  globalThis.fetch = f.fetchMock as any;
+  try {
+    f.setInvoiceEmail("");
+    const response = await worker.fetch(new Request("https://merchant.test/pay?invoice=12345"), f.env);
+    assert.equal(response.status, 409);
+    assert.match(await response.text(), /missing a valid buyer email/);
+    assert.equal(f.checkoutPosts, 0);
   } finally { globalThis.fetch = original; f.db.close(); }
 });
 

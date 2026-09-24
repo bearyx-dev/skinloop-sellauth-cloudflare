@@ -59,6 +59,9 @@ async function pay(url: URL, e: Env) {
   if (!id) return text("A numeric invoice is required.",400);
   const i = await sellauth(e,id); const d = i && invoiceDetails(i);
   if (!d) return text("This invoice cannot currently be paid.",409);
+  const customerEmail = typeof i.email === "string" ? i.email.trim() : "";
+  if (!customerEmail || customerEmail.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail))
+    return text("SellAuth invoice is missing a valid buyer email.",409);
   const old: any = await e.DB.prepare("SELECT * FROM payments WHERE invoice_id=?").bind(id).first();
   let retryExpired = false;
   if (old) {
@@ -94,14 +97,24 @@ async function pay(url: URL, e: Env) {
     if (!changed.meta?.changes) return text("The previous checkout changed; retry later.",409);
   }
   const c = await skinloop(e,"/v1/merchant-api/checkouts",{method:"POST",headers:{"Idempotency-Key":key},body:JSON.stringify({
-    merchantOrderId:id, amount:{value:d.amount_minor,currency:"USD"}, allowedGames:["rust"],
+    merchantOrderId:id, customerEmail, amount:{value:d.amount_minor,currency:"USD"}, allowedGames:["rust"],
     successUrl:`${url.origin}/return?invoice=${id}`, cancelUrl:`${url.origin}/cancel?invoice=${id}`,
     metadata:{source:"sellauth",invoiceId:id,game:"rust"}, expiresInSeconds:3600
   })});
+  if (!c.r.ok) {
+    const message = (c.body as { message?: unknown })?.message;
+    if (c.r.status===400 && message==="redirect URL origin is not allowed")
+      return text("Add this Worker origin to Skinloop checkout redirect origins.",502);
+    if (c.r.status===400 && message==="customerEmail must be a valid email address")
+      return text("SellAuth invoice buyer email was rejected by Skinloop.",502);
+    if (c.r.status===401 || c.r.status===403)
+      return text("Skinloop API key is invalid or lacks permission to create Rust checkouts.",502);
+    return text("Skinloop could not create checkout. Check checkout settings and retry.",502);
+  }
   const checkout = unwrap(c.body);
   let hosted = ""; try { const h = new URL(checkout.hostedUrl); const allowed = new URL(e.SKINLOOP_HOSTED_ORIGIN!); if (h.protocol==="https:" && h.origin===allowed.origin && !h.username && !h.password) hosted=h.toString(); } catch {}
   const expires=clean(checkout.expiresAt || checkout.expires_at);
-  if (!c.r.ok || !hosted || !expires || Date.parse(expires)<=Date.now() || String(checkout.merchantOrderId)!==id || Number(checkout.amount?.value ?? checkout.amount)!==d.amount_minor || String(checkout.amount?.currency).toUpperCase()!=="USD" || JSON.stringify(checkout.allowedGames)!==JSON.stringify(["rust"])) return text("Skinloop returned an unverified checkout.",502);
+  if (!hosted || !expires || Date.parse(expires)<=Date.now() || String(checkout.merchantOrderId)!==id || Number(checkout.amount?.value ?? checkout.amount)!==d.amount_minor || String(checkout.amount?.currency).toUpperCase()!=="USD" || JSON.stringify(checkout.allowedGames)!==JSON.stringify(["rust"])) return text("Skinloop returned an unverified checkout.",502);
   const saved = await e.DB.prepare("UPDATE payments SET checkout_id=?,hosted_url=?,checkout_expires_at=?,status='created',updated_at=? WHERE invoice_id=? AND idempotency_key=? AND status='creating' AND external_payment_id IS NULL").bind(clean(checkout.id,200),hosted,expires,new Date().toISOString(),id,key).run();
   if (!saved.meta?.changes) return text("Checkout state changed; retry later.",409);
   return Response.redirect(hosted,303);
